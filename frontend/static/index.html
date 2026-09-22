@@ -1,0 +1,1457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smart Chef & Pantry Concierge</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
+<script src="/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+:root {
+  --primary: #ea580c;
+  --primary-hover: #c2410c;
+  --primary-light: #fff7ed;
+  --primary-border: #fed7aa;
+  --accent: #d97706;
+  --accent-light: #fef3c7;
+  --bg-canvas: #fcfbf9;
+  --bg-surface: #ffffff;
+  --bg-sidebar: #f8f6f0;
+  --text-main: #1c1917;
+  --text-muted: #78716c;
+  --border-subtle: #e7e5e4;
+  --border-card: #f0ede6;
+  --shadow-sm: 0 1px 3px rgba(28, 25, 23, 0.04);
+  --shadow-card: 0 4px 16px -2px rgba(28, 25, 23, 0.05), 0 2px 6px -1px rgba(28, 25, 23, 0.03);
+  --shadow-elevated: 0 10px 25px -5px rgba(28, 25, 23, 0.08), 0 8px 10px -6px rgba(28, 25, 23, 0.04);
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-full: 9999px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg-canvas);
+  color: var(--text-main);
+  height: 100vh;
+  display: flex;
+  overflow: hidden;
+}
+
+/* Sidebar Styling */
+#sidebar {
+  width: 320px;
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  height: 100vh;
+  overflow-y: auto;
+  transition: transform 0.3s ease;
+  z-index: 50;
+}
+
+.sidebar-header {
+  padding: 20px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+}
+
+.brand-badge {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand-icon {
+  width: 44px;
+  height: 44px;
+  background: linear-gradient(135deg, #ea580c, #d97706);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  box-shadow: 0 4px 10px rgba(234, 88, 12, 0.25);
+}
+
+.brand-titles h1 {
+  font-family: 'Playfair Display', serif;
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--text-main);
+  line-height: 1.2;
+}
+
+.brand-titles .tagline {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #166534;
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  background: #22c55e;
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(0.95); opacity: 0.8; }
+  50% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(0.95); opacity: 0.8; }
+}
+
+.sidebar-section {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.section-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.section-title .badge-count {
+  background: var(--border-subtle);
+  color: var(--text-muted);
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 10px;
+}
+
+/* Pantry Chips */
+.pantry-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 160px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.pantry-item-chip {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  padding: 5px 10px;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-main);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+
+.pantry-item-chip:hover {
+  border-color: var(--primary);
+  background: var(--primary-light);
+  color: var(--primary);
+  transform: translateY(-1px);
+}
+
+.refresh-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  transition: color 0.2s;
+}
+.refresh-btn:hover { color: var(--primary); }
+
+/* Dietary Filters */
+.diet-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.diet-toggle {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  padding: 6px 12px;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.diet-toggle:hover {
+  border-color: var(--primary-border);
+  color: var(--text-main);
+}
+
+.diet-toggle.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(234, 88, 12, 0.25);
+}
+
+/* Portion Scaler */
+.portion-buttons {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.portion-btn {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  padding: 8px 4px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.portion-btn.active {
+  background: var(--accent-light);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Workflow Actions */
+.workflow-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.workflow-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-main);
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: all 0.2s;
+}
+
+.workflow-card:hover {
+  border-color: var(--primary);
+  background: var(--primary-light);
+  color: var(--primary);
+  transform: translateX(2px);
+}
+
+.workflow-card .wf-icon {
+  font-size: 18px;
+}
+
+/* Main Content Area */
+#main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  position: relative;
+  background: var(--bg-canvas);
+}
+
+/* Top App Bar */
+.top-nav {
+  height: 64px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  flex-shrink: 0;
+  z-index: 20;
+}
+
+.nav-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.menu-toggle {
+  display: none;
+  background: transparent;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: var(--text-main);
+}
+
+.nav-title h2 {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+.nav-title p {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.nav-btn {
+  background: var(--bg-canvas);
+  border: 1px solid var(--border-subtle);
+  padding: 6px 14px;
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nav-btn:hover {
+  background: var(--bg-surface);
+  color: var(--text-main);
+  border-color: var(--text-muted);
+}
+
+/* Chat Message Log */
+#log {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  scroll-behavior: smooth;
+}
+
+/* Welcome Hero */
+.welcome-hero {
+  max-width: 640px;
+  margin: 40px auto;
+  text-align: center;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-card);
+  padding: 36px 28px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+
+.hero-icon {
+  font-size: 44px;
+  margin-bottom: 12px;
+}
+
+.welcome-hero h2 {
+  font-family: 'Playfair Display', serif;
+  font-size: 26px;
+  color: var(--text-main);
+  margin-bottom: 8px;
+}
+
+.welcome-hero p {
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.6;
+  margin-bottom: 24px;
+}
+
+.starter-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  text-align: left;
+}
+
+.starter-card {
+  background: var(--bg-canvas);
+  border: 1px solid var(--border-subtle);
+  padding: 14px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.starter-card:hover {
+  border-color: var(--primary);
+  background: var(--primary-light);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+}
+
+.starter-card .sc-icon { font-size: 22px; margin-bottom: 8px; }
+.starter-card h4 { font-size: 13px; font-weight: 700; color: var(--text-main); margin-bottom: 4px; }
+.starter-card p { font-size: 11px; color: var(--text-muted); line-height: 1.4; margin: 0; }
+
+/* Messages */
+.msg {
+  display: flex;
+  gap: 14px;
+  max-width: 860px;
+  width: 100%;
+  animation: fadeIn 0.25s ease forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.msg.user {
+  margin-left: auto;
+  flex-direction: row-reverse;
+}
+
+.avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+  box-shadow: var(--shadow-sm);
+}
+
+.msg.agent .avatar {
+  background: linear-gradient(135deg, #ea580c, #d97706);
+  color: #fff;
+}
+
+.msg.user .avatar {
+  background: #475569;
+  color: #fff;
+  font-size: 14px;
+}
+
+.bubble {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-card);
+  padding: 18px 22px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  color: var(--text-main);
+  line-height: 1.65;
+  font-size: 14px;
+  max-width: calc(100% - 50px);
+  position: relative;
+}
+
+.msg.user .bubble {
+  background: linear-gradient(135deg, #ea580c, #c2410c);
+  color: #ffffff;
+  border: none;
+  border-bottom-right-radius: 4px;
+  box-shadow: 0 4px 12px rgba(234, 88, 12, 0.2);
+}
+
+.msg.agent .bubble {
+  border-top-left-radius: 4px;
+}
+
+/* Markdown typography inside agent bubble */
+.markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4 {
+  font-family: 'Playfair Display', serif;
+  color: var(--text-main);
+  margin-top: 16px;
+  margin-bottom: 8px;
+  line-height: 1.3;
+}
+.markdown-body h1:first-child, .markdown-body h2:first-child, .markdown-body h3:first-child { margin-top: 0; }
+.markdown-body h1 { font-size: 22px; }
+.markdown-body h2 { font-size: 18px; }
+.markdown-body h3 { font-size: 16px; color: #c2410c; }
+.markdown-body h4 { font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); }
+
+.markdown-body p { margin-bottom: 12px; }
+.markdown-body p:last-child { margin-bottom: 0; }
+
+.markdown-body ul, .markdown-body ol {
+  margin-left: 20px;
+  margin-bottom: 14px;
+}
+.markdown-body li { margin-bottom: 6px; }
+
+.markdown-body blockquote {
+  border-left: 3px solid var(--primary);
+  padding-left: 14px;
+  color: var(--text-muted);
+  font-style: italic;
+  margin: 12px 0;
+  background: var(--bg-canvas);
+  padding: 8px 14px;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.markdown-body hr {
+  border: none;
+  border-top: 1px solid var(--border-subtle);
+  margin: 16px 0;
+}
+
+.markdown-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 14px 0;
+  font-size: 13px;
+}
+.markdown-body th, .markdown-body td {
+  border: 1px solid var(--border-subtle);
+  padding: 8px 12px;
+  text-align: left;
+}
+.markdown-body th {
+  background: var(--bg-canvas);
+  font-weight: 600;
+}
+
+.markdown-body strong { font-weight: 700; color: #0c0a09; }
+
+.copy-recipe-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-canvas);
+  border: 1px solid var(--border-subtle);
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  margin-top: 12px;
+  transition: all 0.2s;
+}
+.copy-recipe-btn:hover {
+  background: var(--primary-light);
+  border-color: var(--primary-border);
+  color: var(--primary);
+}
+
+/* Prompt Chips Bar */
+#chips-bar {
+  padding: 8px 24px;
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  background: var(--bg-canvas);
+  border-top: 1px solid var(--border-subtle);
+  white-space: nowrap;
+}
+
+#chips-bar::-webkit-scrollbar { height: 4px; }
+#chips-bar::-webkit-scrollbar-thumb { background: #d6d3d1; border-radius: 4px; }
+
+.chip {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-main);
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chip:hover {
+  background: var(--primary-light);
+  border-color: var(--primary);
+  color: var(--primary);
+  transform: translateY(-1px);
+}
+
+/* Active Filter Badges row */
+#active-filters {
+  padding: 4px 24px;
+  display: none;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--bg-canvas);
+}
+#active-filters.has-filters { display: flex; }
+
+.filter-pill {
+  background: var(--primary-light);
+  border: 1px solid var(--primary-border);
+  color: var(--primary);
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-weight: 600;
+}
+
+/* Form / Input Container */
+#form-container {
+  padding: 12px 24px 20px;
+  background: var(--bg-canvas);
+}
+
+#form {
+  display: flex;
+  align-items: center;
+  background: var(--bg-surface);
+  border: 1.5px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 6px 8px 6px 16px;
+  box-shadow: var(--shadow-card);
+  transition: all 0.2s;
+  position: relative;
+}
+
+#form:focus-within {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.12);
+}
+
+#input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--text-main);
+  outline: none;
+  padding: 8px 0;
+}
+
+#input::placeholder { color: #a8a29e; }
+
+.input-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.quick-action-btn {
+  background: var(--bg-canvas);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  padding: 6px 10px;
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.quick-action-btn:hover {
+  background: var(--primary-light);
+  border-color: var(--primary-border);
+  color: var(--primary);
+}
+
+.send-btn {
+  background: linear-gradient(135deg, #ea580c, #c2410c);
+  color: #fff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.send-btn:hover {
+  background: linear-gradient(135deg, #c2410c, #9a3412);
+  transform: translateY(-1px);
+}
+
+/* ----------------------------------------------------------------------------
+ * A2UI Card Styling: Polished Culinary Card Component
+ * -------------------------------------------------------------------------- */
+.a2card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-card);
+  border-left: 5px solid var(--primary);
+  border-radius: var(--radius-lg);
+  padding: 22px 24px;
+  margin: 16px 0;
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: box-shadow 0.2s;
+}
+.a2card:hover {
+  box-shadow: var(--shadow-elevated);
+}
+
+.a2row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.a2col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.a2text { color: var(--text-main); margin: 0; line-height: 1.5; }
+.a2-h1 {
+  font-family: 'Playfair Display', serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: #0c0a09;
+  letter-spacing: -0.3px;
+}
+.a2-h2 {
+  font-family: 'Playfair Display', serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: #1c1917;
+}
+.a2-h3 {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--primary);
+  margin-top: 6px;
+}
+.a2-caption {
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--bg-canvas);
+  border: 1px solid var(--border-subtle);
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  color: var(--text-main);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.a2divider {
+  border: none;
+  border-top: 1px solid #f0ede6;
+  margin: 6px 0;
+}
+
+.a2list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.a2-item-box {
+  background: var(--bg-canvas);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  font-size: 13px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  transition: background 0.15s;
+}
+.a2-item-box:hover {
+  background: #fdfbf7;
+}
+
+.a2-step-box {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.a2-step-badge {
+  width: 22px;
+  height: 22px;
+  background: var(--primary);
+  color: #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.a2-check {
+  margin-top: 2px;
+  cursor: pointer;
+  accent-color: var(--primary);
+}
+
+.a2img {
+  width: 100%;
+  max-width: 480px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-sm);
+  margin-top: 8px;
+  object-fit: cover;
+}
+
+/* Toast feedback */
+#toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: #1c1917;
+  color: #fff;
+  padding: 10px 18px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 500;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: all 0.25s;
+  z-index: 1000;
+  pointer-events: none;
+}
+#toast.show { opacity: 1; transform: translateY(0); }
+
+/* Responsive Mobile Layout */
+@media (max-width: 860px) {
+  #sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    transform: translateX(-100%);
+    box-shadow: var(--shadow-elevated);
+  }
+  #sidebar.open {
+    transform: translateX(0);
+  }
+  .menu-toggle { display: block; }
+  .starter-cards { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- Left Sidebar / Drawer -->
+<aside id="sidebar">
+  <div class="sidebar-header">
+    <div class="brand-badge">
+      <div class="brand-icon">🍳</div>
+      <div class="brand-titles">
+        <h1>Smart Chef</h1>
+        <span class="tagline">Pantry Concierge</span>
+      </div>
+    </div>
+    <div class="status-badge">
+      <span class="status-dot"></span>
+      <span>Vertex AI Agent Platform • us-east1</span>
+    </div>
+  </div>
+
+  <!-- Live Firestore Pantry Section -->
+  <div class="sidebar-section">
+    <div class="section-title">
+      <span>Live Pantry Inventory</span>
+      <div>
+        <span id="pantry-count" class="badge-count">...</span>
+        <button type="button" class="refresh-btn" onclick="loadPantry()" title="Refresh Pantry">🔄</button>
+      </div>
+    </div>
+    <div id="pantry-chips-container" class="pantry-chips">
+      <span style="font-size: 11px; color: var(--text-muted);">Loading pantry from Firestore...</span>
+    </div>
+  </div>
+
+  <!-- Dietary & Allergen Profile -->
+  <div class="sidebar-section">
+    <div class="section-title">
+      <span>Dietary & Allergen Profile</span>
+    </div>
+    <div class="diet-chips">
+      <button type="button" class="diet-toggle" data-pref="Vegetarian" onclick="toggleDiet(this)">🌱 Vegetarian</button>
+      <button type="button" class="diet-toggle" data-pref="Gluten-Free" onclick="toggleDiet(this)">🌾 Gluten-Free</button>
+      <button type="button" class="diet-toggle" data-pref="Dairy-Free" onclick="toggleDiet(this)">🥛 Dairy-Free</button>
+      <button type="button" class="diet-toggle" data-pref="Nut-Free" onclick="toggleDiet(this)">🥜 Nut-Free</button>
+      <button type="button" class="diet-toggle" data-pref="Shellfish Allergy" onclick="toggleDiet(this)">🦐 Shellfish-Free</button>
+      <button type="button" class="diet-toggle" data-pref="Low-Carb" onclick="toggleDiet(this)">🥑 Low-Carb</button>
+    </div>
+  </div>
+
+  <!-- Household Portions -->
+  <div class="sidebar-section">
+    <div class="section-title">
+      <span>Household Portions</span>
+    </div>
+    <div class="portion-buttons">
+      <button type="button" class="portion-btn active" onclick="setPortion(1, this)">1 Serving</button>
+      <button type="button" class="portion-btn" onclick="setPortion(2, this)">2 Servings</button>
+      <button type="button" class="portion-btn" onclick="setPortion(4, this)">4 Family</button>
+      <button type="button" class="portion-btn" onclick="setPortion(6, this)">6 Feast</button>
+    </div>
+  </div>
+
+  <!-- Workflows -->
+  <div class="sidebar-section">
+    <div class="section-title">
+      <span>Culinary Workflows</span>
+    </div>
+    <div class="workflow-list">
+      <button type="button" class="workflow-card" onclick="triggerWorkflow('meal-prep')">
+        <span class="wf-icon">📅</span>
+        <div>
+          <div>7-Day Meal Prep</div>
+          <div style="font-size: 11px; color: var(--text-muted); font-weight: normal;">Batch plan & grocery list</div>
+        </div>
+      </button>
+      <button type="button" class="workflow-card" onclick="triggerWorkflow('zero-waste')">
+        <span class="wf-icon">🥫</span>
+        <div>
+          <div>Zero-Waste Dinner</div>
+          <div style="font-size: 11px; color: var(--text-muted); font-weight: normal;">Cook with on-hand items</div>
+        </div>
+      </button>
+      <button type="button" class="workflow-card" onclick="triggerWorkflow('herbal-lore')">
+        <span class="wf-icon">🌿</span>
+        <div>
+          <div>Botanical Herbal Lore</div>
+          <div style="font-size: 11px; color: var(--text-muted); font-weight: normal;">Culpeper botanical wisdom</div>
+        </div>
+      </button>
+      <button type="button" class="workflow-card" onclick="triggerWorkflow('plating')">
+        <span class="wf-icon">🎨</span>
+        <div>
+          <div>Plating Visualizer</div>
+          <div style="font-size: 11px; color: var(--text-muted); font-weight: normal;">Imagen photorealistic plating</div>
+        </div>
+      </button>
+    </div>
+  </div>
+</aside>
+
+<!-- Main Chat Canvas -->
+<main id="main">
+  <!-- Top App Navigation -->
+  <header class="top-nav">
+    <div class="nav-left">
+      <button type="button" class="menu-toggle" onclick="toggleSidebar()">☰</button>
+      <div class="nav-title">
+        <h2>Smart Chef & Pantry Concierge</h2>
+        <p>Zero Waste • Dietary-Aware • Scaled Nutrition</p>
+      </div>
+    </div>
+    <div class="nav-right">
+      <button type="button" class="nav-btn" onclick="resetChat()" title="Start New Cooking Session">
+        <span>✨</span>
+        <span>New Session</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Message Stream -->
+  <div id="log">
+    <!-- Empty state hero banner -->
+    <div class="welcome-hero" id="welcome-hero">
+      <div class="hero-icon">🍳</div>
+      <h2>Welcome to Your Kitchen Concierge</h2>
+      <p>I'm your intelligent culinary assistant grounded in your live Firestore pantry inventory, dietary preferences, and herbal wisdom. Let's make something amazing today!</p>
+      
+      <div class="starter-cards">
+        <div class="starter-card" onclick="triggerWorkflow('meal-prep')">
+          <div class="sc-icon">📅</div>
+          <h4>7-Day Meal Prep</h4>
+          <p>Get a full week of prep-ahead recipes with organized groceries.</p>
+        </div>
+        <div class="starter-card" onclick="triggerWorkflow('zero-waste')">
+          <div class="sc-icon">🥫</div>
+          <h4>Pantry Raid</h4>
+          <p>Tell me what you have and I'll create a zero-waste gourmet dinner.</p>
+        </div>
+        <div class="starter-card" onclick="triggerWorkflow('plating')">
+          <div class="sc-icon">🎨</div>
+          <h4>Plating Visuals</h4>
+          <p>Generate photo plating previews and culinary lore.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Prompt Chips Bar -->
+  <div id="chips-bar">
+    <button type="button" class="chip" onclick="handleChip('✨ Plan a 7-day vegetarian meal prep schedule with grocery list')">✨ Plan a 7-day meal prep schedule</button>
+    <button type="button" class="chip" onclick="handleChip('🥫 Check my pantry inventory and suggest a dinner recipe')">🥫 Check pantry inventory & suggest dinner</button>
+    <button type="button" class="chip" onclick="handleChip('🎨 Show me a plating photo for Garlic Herb Chicken & Tomatoes')">🎨 Show me a plating photo for Garlic Herb Chicken</button>
+    <button type="button" class="chip" onclick="handleChip('🌿 What culinary and botanical lore does Culpeper record for Rosemary?')">🌿 Culpeper Rosemary Lore</button>
+    <button type="button" class="chip" onclick="handleChip('🔄 What can I substitute for buttermilk in pancakes?')">🔄 Buttermilk Substitutes</button>
+  </div>
+
+  <!-- Active Filter Indicators -->
+  <div id="active-filters">
+    <span>Active constraints:</span>
+    <div id="filter-pills-list"></div>
+  </div>
+
+  <!-- Input Form Bar -->
+  <div id="form-container">
+    <form id="form">
+      <input id="input" placeholder="Ask about recipes, ingredients, substitutions, or meal prep…" autocomplete="off" autofocus>
+      <div class="input-actions">
+        <button type="button" class="quick-action-btn" onclick="quickPlatingPrompt()" title="Ask for a dish plating image">📷 Plating</button>
+        <button type="button" class="quick-action-btn" onclick="quickPrepPrompt()" title="Quick meal prep">🗓️ Prep</button>
+        <button class="send-btn" type="submit">
+          <span>Send</span>
+          <span>→</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</main>
+
+<div id="toast"></div>
+
+<script>
+const log = document.getElementById("log");
+const form = document.getElementById("form");
+const input = document.getElementById("input");
+const welcomeHero = document.getElementById("welcome-hero");
+const toast = document.getElementById("toast");
+
+let activeDiets = new Set();
+let currentPortion = 1;
+let pantryItems = [];
+
+/* Show toast notification */
+function showToast(msg) {
+  toast.textContent = msg;
+  toast.className = "show";
+  setTimeout(() => { toast.className = ""; }, 2400);
+}
+
+/* Sidebar Toggle for Mobile */
+function toggleSidebar() {
+  document.getElementById("sidebar").classList.toggle("open");
+}
+
+/* Load Pantry from Firestore via /api/pantry */
+async function loadPantry() {
+  const container = document.getElementById("pantry-chips-container");
+  const countBadge = document.getElementById("pantry-count");
+  container.innerHTML = '<span style="font-size: 11px; color: var(--text-muted);">Refreshing...</span>';
+  try {
+    const res = await fetch("/api/pantry");
+    const data = await res.json();
+    pantryItems = data.items || [];
+    countBadge.textContent = pantryItems.length;
+    container.innerHTML = "";
+    if (pantryItems.length === 0) {
+      container.innerHTML = '<span style="font-size: 11px; color: var(--text-muted);">No items found in Firestore.</span>';
+      return;
+    }
+    pantryItems.forEach(item => {
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "pantry-item-chip";
+      const icon = item.category === "produce" ? "🥬" : item.category === "dairy" ? "🥛" : item.category === "pantry" ? "🥫" : "🍗";
+      chip.innerHTML = `<span>${icon}</span> <span>${item.item_name}</span>`;
+      chip.onclick = () => {
+        handleChip(`What can I cook using ${item.item_name} from my pantry?`);
+      };
+      container.appendChild(chip);
+    });
+  } catch (err) {
+    console.error("Error loading pantry:", err);
+    container.innerHTML = '<span style="font-size: 11px; color: #dc2626;">Failed to load pantry</span>';
+  }
+}
+
+/* Dietary Filter Toggle */
+function toggleDiet(btn) {
+  const pref = btn.getAttribute("data-pref");
+  if (activeDiets.has(pref)) {
+    activeDiets.delete(pref);
+    btn.classList.remove("active");
+  } else {
+    activeDiets.add(pref);
+    btn.classList.add("active");
+  }
+  updateFilterBar();
+}
+
+function updateFilterBar() {
+  const bar = document.getElementById("active-filters");
+  const list = document.getElementById("filter-pills-list");
+  list.innerHTML = "";
+  if (activeDiets.size === 0 && currentPortion === 1) {
+    bar.classList.remove("has-filters");
+    return;
+  }
+  bar.classList.add("has-filters");
+  activeDiets.forEach(d => {
+    const p = document.createElement("span");
+    p.className = "filter-pill";
+    p.textContent = d;
+    list.appendChild(p);
+  });
+  if (currentPortion > 1) {
+    const p = document.createElement("span");
+    p.className = "filter-pill";
+    p.textContent = `${currentPortion} servings`;
+    list.appendChild(p);
+  }
+}
+
+/* Portion Scaler */
+function setPortion(num, btn) {
+  currentPortion = num;
+  document.querySelectorAll(".portion-btn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  updateFilterBar();
+  showToast(`Portions set to ${num} serving(s)`);
+}
+
+/* Workflows */
+function triggerWorkflow(type) {
+  if (window.innerWidth < 860) toggleSidebar();
+  let query = "";
+  if (type === "meal-prep") {
+    const dietStr = activeDiets.size > 0 ? Array.from(activeDiets).join(", ") + " " : "";
+    query = `✨ Plan a 7-day ${dietStr}meal prep schedule scaled for ${currentPortion} serving(s), complete with recipe instructions and organized grocery list.`;
+  } else if (type === "zero-waste") {
+    query = `🥫 Check my live pantry inventory from Firestore and suggest a zero-waste dinner recipe for ${currentPortion} serving(s).`;
+  } else if (type === "herbal-lore") {
+    query = `🌿 Search Culpeper's botanical and herbal lore for culinary herbs (like Rosemary or Thyme) and explain how they elevate our cooking.`;
+  } else if (type === "plating") {
+    query = `🎨 Generate a photorealistic plating photo for Garlic Herb Chicken & Heirloom Tomatoes.`;
+  }
+  handleChip(query);
+}
+
+function quickPlatingPrompt() {
+  input.value = "🎨 Show me a plating photo for ";
+  input.focus();
+}
+
+function quickPrepPrompt() {
+  input.value = `✨ Plan a 7-day meal prep schedule for ${currentPortion} serving(s)`;
+  input.focus();
+}
+
+/* Reset Session */
+async function resetChat() {
+  if (confirm("Reset cooking session? This starts a fresh culinary conversation.")) {
+    try {
+      await fetch("/api/reset", { method: "POST" });
+    } catch(e) {}
+    log.innerHTML = "";
+    if (welcomeHero) log.appendChild(welcomeHero);
+    showToast("Session reset cleanly!");
+  }
+}
+
+/* Chip click */
+function handleChip(text) {
+  if (welcomeHero && welcomeHero.parentNode) {
+    welcomeHero.remove();
+  }
+  input.value = text;
+  form.dispatchEvent(new Event("submit"));
+}
+
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
+}
+
+/* Create Bubble */
+function bubble(who) {
+  if (welcomeHero && welcomeHero.parentNode) {
+    welcomeHero.remove();
+  }
+  const m = el("div", "msg " + who);
+  const avatar = el("div", "avatar", who === "agent" ? "👨‍🍳" : "👤");
+  m.appendChild(avatar);
+
+  const b = el("div", "bubble");
+  m.appendChild(b);
+  log.appendChild(m);
+  log.scrollTop = log.scrollHeight;
+  return b;
+}
+
+/* Copy button for recipe text */
+function addCopyButton(bubbleEl, rawText) {
+  const btn = el("button", "copy-recipe-btn", "📋 Copy Recipe");
+  btn.onclick = () => {
+    navigator.clipboard.writeText(rawText).then(() => {
+      showToast("Recipe copied to clipboard!");
+    });
+  };
+  bubbleEl.appendChild(btn);
+}
+
+/* ----------------------------------------------------------------------------
+ * A2UI mini-renderer (v0.8 Basic Catalog subset).
+ * Renders Card / Column / Row / Text / Divider / List / Image / Icon.
+ * -------------------------------------------------------------------------- */
+
+function boundStr(v) {
+  if (v == null) return "";
+  if (typeof v === "string") return v;
+  if (typeof v.literalString === "string") return v.literalString;
+  return "";
+}
+
+function childIds(props) {
+  const ids = [];
+  if (props && typeof props.child === "string") ids.push(props.child);
+  const ch = props && props.children;
+  if (ch && Array.isArray(ch.explicitList)) for (const c of ch.explicitList) if (typeof c === "string") ids.push(c);
+  return ids;
+}
+
+function iconName(n) { return String(n || "").replace(/([a-z0-9])([A-Z])/g, "$1_$2").replace(/\s+/g, "_").toLowerCase(); }
+
+function buildNode(id, comps, seen) {
+  if (!id || seen.has(id)) return null;
+  seen.add(id);
+  const spec = comps[id];
+  if (!spec || typeof spec !== "object") return null;
+  const type = Object.keys(spec)[0];
+  const props = spec[type] || {};
+  const kids = () => childIds(props).map(cid => buildNode(cid, comps, seen)).filter(Boolean);
+
+  switch (type) {
+    case "Card": {
+      const c = el("div", "a2card");
+      kids().forEach(k => c.appendChild(k));
+      return c;
+    }
+    case "Column": {
+      const col = el("div", "a2col");
+      kids().forEach(k => col.appendChild(k));
+      return col;
+    }
+    case "Row": {
+      const r = el("div", "a2row");
+      kids().forEach(k => r.appendChild(k));
+      return r;
+    }
+    case "Text": {
+      const t = boundStr(props.text);
+      const hint = props.usageHint || "body";
+      const cls = hint === "h1" ? "a2text a2-h1"
+                : hint === "h2" ? "a2text a2-h2"
+                : hint === "h3" ? "a2text a2-h3"
+                : hint === "h4" ? "a2text a2-h4"
+                : hint === "caption" ? "a2text a2-caption"
+                : "a2text";
+
+      // If this is a list item or body text starting with bullet, style as interactive item
+      if (t.startsWith("• ")) {
+        const itemBox = el("div", "a2-item-box");
+        const chk = document.createElement("input");
+        chk.type = "checkbox";
+        chk.className = "a2-check";
+        chk.onclick = (ev) => {
+          ev.target.nextElementSibling.style.textDecoration = ev.target.checked ? "line-through" : "none";
+          ev.target.nextElementSibling.style.color = ev.target.checked ? "var(--text-muted)" : "var(--text-main)";
+        };
+        const span = el("span", "", t.substring(2));
+        itemBox.appendChild(chk);
+        itemBox.appendChild(span);
+        return itemBox;
+      }
+
+      // If this is an instruction step starting with number, style with numbered circular badge
+      const stepMatch = t.match(/^(\d+)\.\s*(.*)/);
+      if (stepMatch) {
+        const stepBox = el("div", "a2-item-box a2-step-box");
+        const badge = el("div", "a2-step-badge", stepMatch[1]);
+        const span = el("span", "", stepMatch[2]);
+        stepBox.appendChild(badge);
+        stepBox.appendChild(span);
+        return stepBox;
+      }
+
+      return el("p", cls, t);
+    }
+    case "Divider":
+      return el("hr", "a2divider");
+    case "List": {
+      const ul = el("ul", "a2list");
+      kids().forEach(k => {
+        const li = el("li");
+        li.appendChild(k);
+        ul.appendChild(li);
+      });
+      return ul;
+    }
+    case "Image": {
+      const img = el("img", "a2img");
+      img.src = boundStr(props.url);
+      img.alt = boundStr(props.accessibilityLabel) || "Generated Dish Visual";
+      img.loading = "lazy";
+      return img;
+    }
+    case "Icon": {
+      const name = iconName(boundStr(props.name));
+      return el("span", "a2icon", name ? `[${name}] ` : "");
+    }
+    default: {
+      const d = el("div");
+      kids().forEach(k => d.appendChild(k));
+      return d;
+    }
+  }
+}
+
+function renderA2UI(msg, container) {
+  const rootKey = Object.keys(msg || {})[0];
+  const body = msg && msg[rootKey];
+  if (!body) return;
+
+  const surface = body.surfaceUpdate || body.beginRendering;
+  if (!surface) return;
+
+  const comps = {};
+  for (const c of surface.components || []) {
+    if (c && c.id) comps[c.id] = c.component;
+  }
+  const rootId = surface.rootComponentId || (surface.components && surface.components[0] && surface.components[0].id);
+  const rootNode = buildNode(rootId, comps, new Set());
+  if (rootNode) container.appendChild(rootNode);
+}
+
+/* Form Submit Handling */
+form.onsubmit = async (e) => {
+  e.preventDefault();
+  let text = input.value.trim();
+  if (!text) return;
+  input.value = "";
+
+  // Append active dietary preferences if not already present
+  if (activeDiets.size > 0) {
+    const missing = [];
+    activeDiets.forEach(d => {
+      if (!text.toLowerCase().includes(d.toLowerCase())) missing.push(d);
+    });
+    if (missing.length > 0 && !text.includes("[Dietary:")) {
+      text += ` [Dietary: ${missing.join(", ")}]`;
+    }
+  }
+
+  // Render user bubble
+  const ub = bubble("user");
+  ub.textContent = text;
+
+  // Render agent placeholder
+  const ab = bubble("agent");
+  ab.innerHTML = '<span style="color: var(--text-muted); font-style: italic;">🍳 Smart Chef is preparing your answer…</span>';
+
+  try {
+    const res = await fetch("/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: text }),
+    });
+
+    if (!res.ok) {
+      ab.innerHTML = `<span style="color: #dc2626;">Error: Server returned status ${res.status}</span>`;
+      return;
+    }
+
+    const data = await res.json();
+    ab.innerHTML = "";
+
+    const parts = (data && data.parts) || [];
+    let fullText = "";
+
+    parts.forEach(p => {
+      if (p.kind === "a2ui") {
+        renderA2UI(p.data, ab);
+      } else if (p.kind === "text") {
+        fullText += p.text + "\n\n";
+        const contentDiv = el("div", "markdown-body");
+        if (window.marked && typeof window.marked.parse === "function") {
+          contentDiv.innerHTML = marked.parse(p.text);
+        } else {
+          contentDiv.textContent = p.text;
+        }
+        ab.appendChild(contentDiv);
+      }
+    });
+
+    if (fullText.trim().length > 100) {
+      addCopyButton(ab, fullText);
+    }
+
+  } catch (err) {
+    ab.innerHTML = `<span style="color: #dc2626;">Connection error: ${err.message}</span>`;
+  }
+};
+
+// Initial pantry load on startup
+loadPantry();
+</script>
+</body>
+</html>
