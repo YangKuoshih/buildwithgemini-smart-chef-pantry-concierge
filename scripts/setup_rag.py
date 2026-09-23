@@ -2,10 +2,16 @@ from vertexai.preview import rag
 from vertexai.preview.rag.utils import resources as rr
 import vertexai
 import time
+import os
 
-PROJECT_ID = "qwiklabs-gcp-04-0b819a9381db"
-LOCATION = "us-central1"
-GCS_PATH = "gs://smart-chef-pantry-qwiklabs-gcp-04-0b819a9381db/rag/pg49513.txt"
+PROJECT_ID = (
+    os.environ.get("GOOGLE_CLOUD_PROJECT")
+    or os.environ.get("PROJECT_ID")
+    or "qwiklabs-gcp-04-0b819a9381db"
+)
+LOCATION = os.environ.get("LOCATION", "us-central1")
+BUCKET_NAME = os.environ.get("IMAGE_BUCKET_NAME", f"smart-chef-pantry-{PROJECT_ID}")
+GCS_PATH = f"gs://{BUCKET_NAME}/rag/pg49513.txt"
 
 print("Initializing vertexai...")
 vertexai.init(project=PROJECT_ID, location=LOCATION)

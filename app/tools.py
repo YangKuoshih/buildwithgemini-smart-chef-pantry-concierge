@@ -6,10 +6,22 @@ from google.cloud import firestore, storage
 from google.genai import types
 from google.adk.tools import ToolContext
 
-# Explicitly hardcode project ID and bucket name as strings
-FIRESTORE_PROJECT_ID = "qwiklabs-gcp-04-0b819a9381db"
-IMAGE_BUCKET_NAME = "smart-chef-pantry-qwiklabs-gcp-04-0b819a9381db"
-RAG_CORPUS_NAME = "projects/194463028823/locations/us-central1/ragCorpora/4287629155396222976"
+import os
+
+# Dynamically resolve project ID and bucket name from environment (fallback to defaults)
+GOOGLE_CLOUD_PROJECT = (
+    os.environ.get("GOOGLE_CLOUD_PROJECT")
+    or os.environ.get("PROJECT_ID")
+    or "qwiklabs-gcp-04-0b819a9381db"
+)
+FIRESTORE_PROJECT_ID = os.environ.get("FIRESTORE_PROJECT_ID", GOOGLE_CLOUD_PROJECT)
+IMAGE_BUCKET_NAME = os.environ.get(
+    "IMAGE_BUCKET_NAME", f"smart-chef-pantry-{GOOGLE_CLOUD_PROJECT}"
+)
+RAG_CORPUS_NAME = os.environ.get(
+    "RAG_CORPUS_NAME",
+    "projects/194463028823/locations/us-central1/ragCorpora/4287629155396222976",
+)
 
 RECIPE_DATABASE = [
     # Breakfasts
@@ -832,13 +844,16 @@ def generate_dish_image(dish_name: str, tool_context: ToolContext) -> Dict[str, 
                 print(f"Artifact save skipped: {se}")
 
         # 2. Upload same bytes to public Cloud Storage bucket
-        storage_client = storage.Client(project=FIRESTORE_PROJECT_ID)
-        bucket = storage_client.bucket(IMAGE_BUCKET_NAME)
-        blob_path = f"dishes/{artifact_filename}"
-        blob = bucket.blob(blob_path)
-        blob.upload_from_string(image_bytes, content_type="image/jpeg")
-
-        public_url = f"https://storage.googleapis.com/{IMAGE_BUCKET_NAME}/{blob_path}"
+        public_url = ""
+        try:
+            storage_client = storage.Client(project=FIRESTORE_PROJECT_ID)
+            bucket = storage_client.bucket(IMAGE_BUCKET_NAME)
+            blob_path = f"dishes/{artifact_filename}"
+            blob = bucket.blob(blob_path)
+            blob.upload_from_string(image_bytes, content_type="image/jpeg")
+            public_url = f"https://storage.googleapis.com/{IMAGE_BUCKET_NAME}/{blob_path}"
+        except Exception as upload_err:
+            print(f"Bucket upload optional step skipped or failed: {upload_err}")
 
         return {
             "status": "success",

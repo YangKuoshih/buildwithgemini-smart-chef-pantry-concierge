@@ -51,7 +51,11 @@ RESOURCE = os.environ.get(
 AGENT_DIRECTORY = os.environ.get("AGENT_DIRECTORY", "app")
 LOCATION = RESOURCE.split("/locations/")[1].split("/")[0]
 
-FIRESTORE_PROJECT = "qwiklabs-gcp-04-0b819a9381db"
+FIRESTORE_PROJECT = (
+    os.environ.get("FIRESTORE_PROJECT_ID")
+    or os.environ.get("GOOGLE_CLOUD_PROJECT")
+    or "qwiklabs-gcp-04-0b819a9381db"
+)
 
 A2A_BASE = (
     f"https://{LOCATION}-aiplatform.googleapis.com/reasoningEngines/v1/"

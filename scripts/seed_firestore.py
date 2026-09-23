@@ -1,8 +1,13 @@
 """Seed Firestore with sample pantry inventory items for Smart Chef & Pantry Concierge."""
 
+import os
 from google.cloud import firestore
 
-PROJECT_ID = "qwiklabs-gcp-04-0b819a9381db"
+PROJECT_ID = (
+    os.environ.get("GOOGLE_CLOUD_PROJECT")
+    or os.environ.get("PROJECT_ID")
+    or "qwiklabs-gcp-04-0b819a9381db"
+)
 COLLECTION_NAME = "pantry_inventory"
 
 SEEDED_ITEMS = [

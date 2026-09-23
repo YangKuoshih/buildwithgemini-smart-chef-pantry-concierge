@@ -1,94 +1,177 @@
-# recipe-agent
+# 🧑‍🍳 Smart Chef & Pantry Concierge
 
-Simple ReAct agent
-Agent generated with `agents-cli` version `1.4.0`
+An AI culinary concierge powered by **Google Agent Development Kit (ADK)**, **Gemini 2.5 Flash**, **Vertex AI Agent Runtime**, **A2UI (Agent-to-User Interface)**, **Firestore**, and **Cloud Storage**.
 
-## Project Structure
+---
+
+## ✨ Features
+
+- **Pantry Inventory Tracking**: Automatically checks and manages fresh ingredients and shelf-stable staples in Google Cloud Firestore.
+- **Dynamic Dish Suggestions**: Provides 3–4 tailored dish recommendations based on available pantry items, tagged with prep time, difficulty, and pantry-match scores.
+- **Standardized Recipe Cards**:
+  - **Completed Dish Photography**: Generates a high-definition photograph of the completed dish via Vertex AI Imagen 3 and hosts it on Cloud Storage.
+  - **Portioned Ingredients**: Lists exact portioned amounts and units.
+  - **Interactive Ingredient Previews**: Each ingredient line includes an interactive checkbox, ingredient thumbnail, and floating hover popover preview.
+  - **Numbered Action Steps**: Clearly labeled, numbered preparation and cooking steps.
+  - **Chef's Pro Tips**: Actionable culinary techniques.
+- **A2UI Rich Display Components**: Natively renders cards, columns, rows, images, and checklist items in both the local development playground and custom Cloud Run web frontend.
+- **Copy to Clipboard**: One-click recipe copying directly from the web chat.
+
+---
+
+## 🏗️ Architecture
 
 ```
-recipe-agent/
-├── app/         # Core agent code
-│   ├── agent.py               # Main agent logic
-│   ├── fast_api_app.py        # FastAPI Backend server
-│   └── app_utils/             # App utilities and helpers
-├── tests/                     # Unit, integration, and load tests
-├── GEMINI.md                  # AI-assisted development guide
-└── pyproject.toml             # Project dependencies
+┌─────────────────────────────────┐
+│     Cloud Run Web Frontend      │ (FastAPI + A2UI HTML/CSS/JS)
+└────────────────┬────────────────┘
+                 │ A2A Protocol (Agent-to-Agent)
+                 ▼
+┌─────────────────────────────────┐
+│ Vertex AI Reasoning Engine      │ (ADK Agent Runtime + Gemini 2.5 Flash)
+└───────┬──────────────┬──────────┘
+        │              │
+        ▼              ▼
+┌──────────────┐ ┌───────────────────────────┐
+│  Firestore   │ │ Public Cloud Storage      │
+│  (Inventory) │ │ (Generated Dish Photos)   │
+└──────────────┘ └───────────────────────────┘
 ```
 
-> 💡 **Tip:** Use [Antigravity CLI](https://antigravity.google/) for AI-assisted development - project context is pre-configured in `GEMINI.md`.
+---
 
-## Requirements
+## 🚀 Quick Start (Local Development)
 
-Before you begin, ensure you have:
-- **uv**: Python package manager (used for all dependency management in this project) - [Install](https://docs.astral.sh/uv/getting-started/installation/) ([add packages](https://docs.astral.sh/uv/concepts/dependencies/) with `uv add <package>`)
-- **agents-cli**: Agents CLI - Install with `uv tool install google-agents-cli`
-- **Google Cloud SDK**: For GCP services - [Install](https://cloud.google.com/sdk/docs/install)
+### 1. Prerequisites
+- **Python 3.11+**
+- **uv**: Python package manager (`curl -LsSf https://astral.sh/uv/install.sh | sh`)
+- **agents-cli**: Google Agent Development Kit CLI (`uv tool install google-agents-cli`)
+- **Google Cloud SDK**: (`gcloud auth login` and `gcloud auth application-default login`)
 
-
-## Quick Start
-
-Install `agents-cli` and its skills if not already installed:
-
-```bash
-uvx google-agents-cli setup
-```
-
-Install required packages:
-
+### 2. Install Dependencies
 ```bash
 agents-cli install
 ```
 
-Test the agent with a local web server:
-
+### 3. Launch Local Playground
 ```bash
 agents-cli playground
 ```
-
-You can also use features from the [ADK](https://adk.dev/) CLI with `uv run adk`.
-
-## Commands
-
-| Command              | Description                                                                                 |
-| -------------------- | ------------------------------------------------------------------------------------------- |
-| `agents-cli install` | Install dependencies using uv                                                         |
-| `agents-cli playground` | Launch local development environment                                                  |
-| `agents-cli lint`    | Run code quality checks                                                               |
-| `agents-cli eval`    | Evaluate agent behavior (generate, grade, analyze, and more — see `agents-cli eval --help`) |
-| `uv run pytest tests/unit tests/integration` | Run unit and integration tests                                                        |
-| `agents-cli deploy`  | Deploy agent to Agent Runtime                                                                |
-| `agents-cli publish gemini-enterprise` | Register deployed agent to Gemini Enterprise                    || [A2A Inspector](https://github.com/a2aproject/a2a-inspector) | Launch A2A Protocol Inspector                                                        |
-
-## 🛠️ Project Management
-
-| Command | What It Does |
-|---------|--------------|
-| `agents-cli scaffold enhance` | Add CI/CD pipelines and Terraform infrastructure |
-| `agents-cli infra cicd` | One-command setup of entire CI/CD pipeline + infrastructure |
-| `agents-cli scaffold upgrade` | Auto-upgrade to latest version while preserving customizations |
+This starts the local ADK Web interactive development UI at `http://localhost:8080/dev-ui/?app=app`.
 
 ---
 
-## Development
+## ☁️ Deploying to Your Own Google Cloud Project
 
-Edit your agent logic in `app/agent.py` and test with `agents-cli playground` - it auto-reloads on save.
+You can easily reproduce and launch this entire application on your personal Google Cloud account.
 
-## Deployment
-
+### Method 1: One-Click Setup Script
+Ensure you are logged into your Google Cloud account and have your target project selected:
 ```bash
-gcloud config set project <your-project-id>
-agents-cli deploy
+gcloud auth login
+gcloud auth application-default login
+gcloud config set project <YOUR_GCP_PROJECT_ID>
 ```
 
-To add CI/CD and Terraform, run `agents-cli scaffold enhance`.
-To set up your production infrastructure, run `agents-cli infra cicd`.
+Then run the automated setup script:
+```bash
+./setup_gcp.sh
+```
+This script automatically:
+1. Enables required GCP APIs (`aiplatform`, `run`, `firestore`, `storage`, `artifactregistry`, `cloudbuild`).
+2. Creates the public Cloud Storage bucket `gs://smart-chef-pantry-<YOUR_PROJECT_ID>` for dish photos.
+3. Initializes Firestore and seeds initial pantry ingredients (`scripts/seed_firestore.py`).
+4. Deploys the ADK Agent to **Vertex AI Reasoning Engine** (`agents-cli deploy`).
+5. Builds and deploys the web frontend to **Cloud Run**.
 
-## Observability
+---
 
-Built-in telemetry exports to Cloud Trace, BigQuery, and Cloud Logging.
+### Method 2: Manual Step-by-Step Deployment
 
-## A2A Inspector
+If you prefer running each step individually:
 
-This agent supports the [A2A Protocol](https://a2a-protocol.org/). Use the [A2A Inspector](https://github.com/a2aproject/a2a-inspector) to test interoperability.
-See the [A2A Inspector docs](https://github.com/a2aproject/a2a-inspector) for details.
+#### Step 1: Enable Google Cloud APIs
+```bash
+export PROJECT_ID=$(gcloud config get-value project)
+export REGION="us-east1"
+
+gcloud services enable \
+  aiplatform.googleapis.com \
+  run.googleapis.com \
+  firestore.googleapis.com \
+  storage.googleapis.com \
+  artifactregistry.googleapis.com \
+  cloudbuild.googleapis.com \
+  --project="${PROJECT_ID}"
+```
+
+#### Step 2: Create Public Storage Bucket for Dish Photos
+```bash
+export BUCKET_NAME="smart-chef-pantry-${PROJECT_ID}"
+
+gcloud storage buckets create "gs://${BUCKET_NAME}" --location="${REGION}" --project="${PROJECT_ID}"
+gcloud storage buckets add-iam-policy-binding "gs://${BUCKET_NAME}" \
+  --member="allUsers" \
+  --role="roles/storage.objectViewer"
+```
+
+#### Step 3: Initialize Firestore & Seed Pantry Items
+```bash
+gcloud firestore databases create --location=nam5 --project="${PROJECT_ID}" || true
+export GOOGLE_CLOUD_PROJECT="${PROJECT_ID}"
+python3 scripts/seed_firestore.py
+```
+
+#### Step 4: Deploy Agent to Vertex AI Reasoning Engine
+```bash
+agents-cli deploy --project="${PROJECT_ID}" --no-confirm-project
+```
+Note the **Agent Runtime ID** returned in the terminal (e.g., `projects/.../locations/us-east1/reasoningEngines/...`).
+
+#### Step 5: Deploy Frontend to Cloud Run
+```bash
+RE_ID=$(python3 -c 'import json; print(json.load(open("deployment_metadata.json"))["remote_agent_runtime_id"])')
+
+gcloud run deploy smart-chef-pantry-frontend \
+  --source frontend \
+  --region="${REGION}" \
+  --allow-unauthenticated \
+  --set-env-vars="AGENT_ENGINE_RESOURCE_NAME=${RE_ID},AGENT_DIRECTORY=app,GOOGLE_CLOUD_PROJECT=${PROJECT_ID},IMAGE_BUCKET_NAME=${BUCKET_NAME}" \
+  --project="${PROJECT_ID}"
+```
+
+---
+
+## 🛠️ Antigravity & Agent Skills
+
+This repository includes a full collection of **18 agent skills** in the `skills/` directory.
+
+To install these skills into your local Antigravity environment:
+```bash
+./install_skills.sh
+```
+Or unzip `skills/agent_skills_bundle.zip` directly into your Antigravity skills directory (`~/.gemini/antigravity/skills/` or `.agents/skills/`).
+
+---
+
+## 📂 Project Structure
+
+```
+├── app/
+│   ├── agent.py               # Root ADK agent with Gemini 2.5 Flash & A2UI
+│   ├── tools.py               # Custom function tools (Firestore, Imagen 3, RAG)
+│   ├── a2ui_prompt.txt        # A2UI system design prompt
+│   └── a2ui_utils.py          # A2UI callback transformer
+├── frontend/
+│   ├── main.py                # FastAPI proxy server (A2A protocol client)
+│   ├── static/index.html      # Responsive chat UI with A2UI renderer & hover tooltips
+│   └── Dockerfile             # Container definition for Cloud Run
+├── scripts/
+│   ├── seed_firestore.py      # Seeds sample pantry inventory into Firestore
+│   └── setup_rag.py           # Sets up Vertex AI RAG corpus
+├── skills/                    # 18 production-ready Agent Skills
+├── install_skills.sh          # One-command skill installer for Antigravity
+├── setup_gcp.sh               # One-command GCP reproduction script
+├── deployment_metadata.json   # Deployed reasoning engine metadata
+└── pyproject.toml             # Python dependencies and build config
+```
