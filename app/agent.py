@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 import pathlib
 from google.adk.agents import Agent
 from google.adk.agents.callback_context import CallbackContext
@@ -21,6 +22,8 @@ from google.adk.code_executors import AgentEngineSandboxCodeExecutor
 from google.adk.models import Gemini
 from google.adk.tools.preload_memory_tool import PreloadMemoryTool
 from google.genai import types
+
+logger = logging.getLogger(__name__)
 
 from app.a2ui_utils import a2ui_callback
 from app.tools import (
@@ -106,7 +109,6 @@ root_agent = Agent(
         generate_dish_image,
     ],
     after_model_callback=a2ui_callback,
-    after_agent_callback=generate_memories_callback,
 )
 
 app = App(

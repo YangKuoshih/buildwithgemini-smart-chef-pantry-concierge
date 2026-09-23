@@ -26,6 +26,7 @@ from a2a.types import (
     Part,
     Role,
     TaskArtifactUpdateEvent,
+    TaskState,
     TextPart,
     TransportProtocol,
 )
@@ -36,7 +37,7 @@ from google.cloud import firestore
 
 RESOURCE = os.environ.get(
     "AGENT_ENGINE_RESOURCE_NAME",
-    "projects/194463028823/locations/us-east1/reasoningEngines/6868176348716728320",
+    "projects/194463028823/locations/us-east1/reasoningEngines/7433941051905146880",
 )
 AGENT_DIRECTORY = os.environ.get("AGENT_DIRECTORY", "app")
 LOCATION = RESOURCE.split("/locations/")[1].split("/")[0]
@@ -93,7 +94,10 @@ async def _get_card(client: httpx.AsyncClient) -> AgentCard:
 
 def _text_to_a2ui(text: str) -> dict | None:
     """If text contains a structured recipe, convert it into an A2UI v0.8 message."""
-    if not ("ingredient" in text.lower() and ("instruction" in text.lower() or "step" in text.lower() or "direction" in text.lower())):
+    lower = text.lower()
+    if not ("ingredient" in lower and ("instruction" in lower or "step" in lower or "direction" in lower)):
+        return None
+    if "7-day" in lower or "meal prep plan" in lower or "grocery list" in lower or "meal prep schedule" in lower:
         return None
 
     # Parse recipe title
@@ -268,6 +272,27 @@ def _text_to_a2ui(text: str) -> dict | None:
     }
 
 
+def _bound_str(val):
+    if isinstance(val, str):
+        return val
+    if isinstance(val, dict):
+        return val.get("literalString", "") or val.get("path", "") or ""
+    return str(val) if val is not None else ""
+
+
+def _extract_text_from_a2ui(payload: dict) -> str:
+    texts = []
+    su = payload.get("surfaceUpdate") or (payload.get("components") and payload)
+    if isinstance(su, dict):
+        for c in su.get("components", []):
+            comp = c.get("component", {}) if isinstance(c, dict) else {}
+            if "Text" in comp:
+                t = _bound_str(comp["Text"].get("text"))
+                if t:
+                    texts.append(t)
+    return "\n\n".join(texts)
+
+
 def _extract_parts(parts: list) -> list[dict]:
     out: list[dict] = []
     has_a2ui = False
@@ -276,10 +301,19 @@ def _extract_parts(parts: list) -> list[dict]:
         root = getattr(p, "root", p)
         # Direct A2UI data part
         if getattr(root, "data", None) is not None:
-            meta = getattr(root, "metadata", None) or {}
+            raw_data = root.data
+            inner = raw_data.get("data") if isinstance(raw_data, dict) else None
+            meta = (raw_data.get("metadata") if isinstance(raw_data, dict) else None) or getattr(root, "metadata", None) or {}
             mime = meta.get("mimeType") if isinstance(meta, dict) else None
-            if mime == _A2UI_MIME:
-                out.append({"kind": "a2ui", "data": root.data})
+            if mime == _A2UI_MIME or (isinstance(inner, dict) and any(k in inner for k in ("beginRendering", "surfaceUpdate", "dataModelUpdate"))):
+                payload = inner if (isinstance(inner, dict) and any(k in inner for k in ("beginRendering", "surfaceUpdate", "dataModelUpdate"))) else raw_data
+                raw_text = _extract_text_from_a2ui(payload)
+                out.append({"kind": "a2ui", "data": payload, "rawText": raw_text})
+                has_a2ui = True
+                continue
+            elif isinstance(raw_data, dict) and any(k in raw_data for k in ("beginRendering", "surfaceUpdate", "dataModelUpdate")):
+                raw_text = _extract_text_from_a2ui(raw_data)
+                out.append({"kind": "a2ui", "data": raw_data, "rawText": raw_text})
                 has_a2ui = True
                 continue
 
@@ -325,18 +359,20 @@ def _extract_parts(parts: list) -> list[dict]:
                         rec_match = re.search(recipe_pattern, text, re.DOTALL | re.I)
                         if rec_match:
                             intro = text[:rec_match.start()].strip()
+                            recipe_body = text[rec_match.start():rec_match.end()].strip()
                             remainder = text[rec_match.end():].strip()
                             remainder = re.sub(r"^\s*---\s*", "", remainder).strip()
                             if intro:
                                 out.append({"kind": "text", "text": intro})
-                            out.append({"kind": "a2ui", "data": recipe_a2ui})
+                            out.append({"kind": "a2ui", "data": recipe_a2ui, "rawText": recipe_body})
                             if remainder:
                                 out.append({"kind": "text", "text": remainder})
                             has_a2ui = True
                             continue
                         else:
-                            out.append({"kind": "a2ui", "data": recipe_a2ui})
+                            out.append({"kind": "a2ui", "data": recipe_a2ui, "rawText": text})
                             has_a2ui = True
+                            continue
 
                 out.append({"kind": "text", "text": text})
             continue
@@ -371,10 +407,19 @@ async def get_pantry():
 
 
 @app.post("/api/reset")
-async def reset_session():
+async def reset_session(req: Request = None):
     global _contexts
+    if req is not None:
+        try:
+            body = await req.json()
+            uid = body.get("user_id")
+            if uid and uid in _contexts:
+                _contexts.pop(uid, None)
+                return JSONResponse({"status": "reset", "message": f"Session {uid} reset successfully"})
+        except Exception:
+            pass
     _contexts.clear()
-    return JSONResponse({"status": "reset", "message": "Session reset successfully"})
+    return JSONResponse({"status": "reset", "message": "All sessions reset successfully"})
 
 
 @app.post("/chat")
@@ -405,33 +450,63 @@ async def chat(req: Request):
         )
 
         last_task = None
-        got_artifact_update = False
-        async for event in a2a_client.send_message(msg):
-            if not isinstance(event, tuple):
-                continue
-            task, update = event
-            if task is not None:
-                last_task = task
-                if getattr(task, "context_id", None):
-                    _contexts[user_id] = task.context_id
-            if isinstance(update, TaskArtifactUpdateEvent):
-                got_artifact_update = True
-                parts.extend(_extract_parts(update.artifact.parts))
-            elif hasattr(update, "status") and getattr(update.status, "message", None):
-                status_msg = update.status.message
-                if getattr(status_msg, "parts", None):
-                    parts.extend(_extract_parts(status_msg.parts))
+        artifact_parts: list[dict] = []
+        latest_status_message = None
 
+        try:
+            async for event in a2a_client.send_message(msg):
+                if not isinstance(event, tuple):
+                    continue
+                task, update = event
+                if task is not None:
+                    last_task = task
+                    if getattr(task, "context_id", None):
+                        _contexts[user_id] = task.context_id
+                if isinstance(update, TaskArtifactUpdateEvent):
+                    artifact_parts.extend(_extract_parts(update.artifact.parts))
+                elif hasattr(update, "status") and getattr(update.status, "message", None):
+                    status_msg = update.status.message
+                    if getattr(status_msg, "parts", None):
+                        latest_status_message = status_msg
+        except Exception as e:
+            # If sending fails on existing context, clear context so user can retry cleanly
+            _contexts.pop(user_id, None)
+            return JSONResponse({"parts": [{"kind": "text", "text": f"⚠️ Communication error: {str(e)}. Session has been refreshed, please try your prompt again."}]})
+
+        # Process artifact parts first
+        if artifact_parts:
+            parts.extend(artifact_parts)
+        elif latest_status_message:
+            for p in _extract_parts(latest_status_message.parts):
+                if p not in parts:
+                    parts.append(p)
+
+        # Fallback to task history if stream didn't yield parts
         if not parts and last_task is not None:
             for h_msg in getattr(last_task, "history", None) or []:
                 if getattr(h_msg, "role", None) in (Role.agent, "agent") and getattr(h_msg, "parts", None):
-                    parts.extend(_extract_parts(h_msg.parts))
+                    for p in _extract_parts(h_msg.parts):
+                        if p not in parts:
+                            parts.append(p)
             if not parts:
                 for artifact in getattr(last_task, "artifacts", None) or []:
-                    parts.extend(_extract_parts(artifact.parts))
+                    for p in _extract_parts(artifact.parts):
+                        if p not in parts:
+                            parts.append(p)
+
+        # Check if the task failed
+        task_state = getattr(getattr(last_task, "status", None), "state", None)
+        if task_state in ("failed", TaskState.failed):
+            _contexts.pop(user_id, None)
+            if not parts:
+                st_msg = getattr(getattr(last_task, "status", None), "message", None)
+                if st_msg and getattr(st_msg, "parts", None):
+                    parts.extend(_extract_parts(st_msg.parts))
+                if not parts:
+                    parts = [{"kind": "text", "text": "👨‍🍳 Chef assistant encountered an issue generating this recipe. Your session has been refreshed—please try your request again."}]
 
     if not parts:
-        parts = [{"kind": "text", "text": "(The agent didn't return a reply.)"}]
+        parts = [{"kind": "text", "text": "👨‍🍳 Chef assistant is ready! Please try submitting your question again."}]
     return JSONResponse({"parts": parts})
 
 

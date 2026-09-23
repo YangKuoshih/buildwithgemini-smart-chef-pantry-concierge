@@ -1194,11 +1194,23 @@ function quickPrepPrompt() {
   input.focus();
 }
 
+let currentUserId = sessionStorage.getItem("chef_user_id");
+if (!currentUserId) {
+  currentUserId = "chef_user_" + Math.random().toString(36).substring(2, 10);
+  sessionStorage.setItem("chef_user_id", currentUserId);
+}
+
 /* Reset Session */
 async function resetChat() {
   if (confirm("Reset cooking session? This starts a fresh culinary conversation.")) {
     try {
-      await fetch("/api/reset", { method: "POST" });
+      await fetch("/api/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: currentUserId }),
+      });
+      currentUserId = "chef_user_" + Math.random().toString(36).substring(2, 10);
+      sessionStorage.setItem("chef_user_id", currentUserId);
     } catch(e) {}
     log.innerHTML = "";
     if (welcomeHero) log.appendChild(welcomeHero);
@@ -1365,21 +1377,55 @@ function buildNode(id, comps, seen) {
   }
 }
 
-function renderA2UI(msg, container) {
-  const rootKey = Object.keys(msg || {})[0];
-  const body = msg && msg[rootKey];
-  if (!body) return;
-
-  const surface = body.surfaceUpdate || body.beginRendering;
-  if (!surface) return;
-
+// Render one or more A2UI messages (beginRendering + surfaceUpdate) into container
+function renderSurface(messages, container) {
   const comps = {};
-  for (const c of surface.components || []) {
-    if (c && c.id) comps[c.id] = c.component;
+  const roots = [];
+  for (const m of messages) {
+    if (!m || typeof m !== "object") continue;
+    if (m.beginRendering && typeof m.beginRendering.root === "string") roots.push(m.beginRendering.root);
+    const su = m.surfaceUpdate || (m.components ? m : null);
+    if (su && Array.isArray(su.components)) {
+      for (const c of su.components) {
+        if (c && c.id && c.component) comps[c.id] = c.component;
+      }
+    }
   }
-  const rootId = surface.rootComponentId || (surface.components && surface.components[0] && surface.components[0].id);
-  const rootNode = buildNode(rootId, comps, new Set());
-  if (rootNode) container.appendChild(rootNode);
+  let rootIds = roots.filter(r => comps[r]);
+  if (rootIds.length === 0) {
+    const referenced = new Set();
+    for (const id in comps) {
+      const spec = comps[id];
+      childIds(spec[Object.keys(spec)[0]] || {}).forEach(c => referenced.add(c));
+    }
+    rootIds = Object.keys(comps).filter(id => !referenced.has(id));
+  }
+  let drew = false;
+  for (const rid of rootIds) {
+    const node = buildNode(rid, comps, new Set());
+    if (node) {
+      container.appendChild(node);
+      drew = true;
+    }
+  }
+  return drew;
+}
+
+function flattenText(messages) {
+  const out = [];
+  for (const m of messages) {
+    if (!m || typeof m !== "object") continue;
+    const su = m.surfaceUpdate || (m.components ? m : null);
+    if (su && Array.isArray(su.components)) {
+      for (const c of su.components) {
+        if (c && c.component && c.component.Text) {
+          const t = boundStr(c.component.Text.text);
+          if (t) out.push(t);
+        }
+      }
+    }
+  }
+  return out.join("\n\n").trim();
 }
 
 /* Form Submit Handling */
@@ -1412,7 +1458,7 @@ form.onsubmit = async (e) => {
     const res = await fetch("/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: text }),
+      body: JSON.stringify({ message: text, user_id: currentUserId }),
     });
 
     if (!res.ok) {
@@ -1426,22 +1472,40 @@ form.onsubmit = async (e) => {
     const parts = (data && data.parts) || [];
     let fullText = "";
 
-    parts.forEach(p => {
-      if (p.kind === "a2ui") {
-        renderA2UI(p.data, ab);
-      } else if (p.kind === "text") {
-        fullText += p.text + "\n\n";
-        const contentDiv = el("div", "markdown-body");
-        if (window.marked && typeof window.marked.parse === "function") {
-          contentDiv.innerHTML = marked.parse(p.text);
-        } else {
-          contentDiv.textContent = p.text;
-        }
-        ab.appendChild(contentDiv);
+    const a2uiParts = parts.filter(p => p && p.kind === "a2ui" && p.data);
+    const textParts = parts.filter(p => p && p.kind === "text");
+
+    textParts.forEach(p => {
+      fullText += p.text + "\n\n";
+      const contentDiv = el("div", "markdown-body");
+      if (window.marked && typeof window.marked.parse === "function") {
+        contentDiv.innerHTML = marked.parse(p.text);
+      } else {
+        contentDiv.textContent = p.text;
       }
+      ab.appendChild(contentDiv);
     });
 
-    if (fullText.trim().length > 100) {
+    if (a2uiParts.length > 0) {
+      const a2uiMsgs = a2uiParts.map(p => p.data);
+      const drew = renderSurface(a2uiMsgs, ab);
+      
+      a2uiParts.forEach(p => {
+        if (p.rawText) fullText += p.rawText + "\n\n";
+      });
+
+      const flat = flattenText(a2uiMsgs);
+      if (!drew && flat) {
+        const fallbackDiv = el("div", "markdown-body");
+        fallbackDiv.innerHTML = window.marked ? marked.parse(flat) : flat;
+        ab.appendChild(fallbackDiv);
+      }
+      if (flat && !fullText.includes(flat)) {
+        fullText += flat + "\n\n";
+      }
+    }
+
+    if (fullText.trim().length > 50) {
       addCopyButton(ab, fullText);
     }
 
