@@ -21,15 +21,24 @@ import httpx
 from a2a.client import ClientConfig, ClientFactory
 from a2a.types import (
     AgentCard,
-    FilePart,
     Message,
     Part,
     Role,
     TaskArtifactUpdateEvent,
     TaskState,
-    TextPart,
-    TransportProtocol,
 )
+try:
+    from a2a.types import TransportProtocol
+except ImportError:
+    try:
+        from a2a.compat.v0_3.types import TransportProtocol
+    except ImportError:
+        from a2a.utils import TransportProtocol
+try:
+    from a2a.types import FilePart, TextPart
+except ImportError:
+    FilePart = type("FilePart", (), {})
+    TextPart = type("TextPart", (), {})
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -93,7 +102,7 @@ async def _get_card(client: httpx.AsyncClient) -> AgentCard:
 
 
 def _text_to_a2ui(text: str) -> dict | None:
-    """If text contains a structured recipe, convert it into an A2UI v0.8 message."""
+    """If text contains a structured recipe, convert it into an A2UI v0.8 message with hero image, portioned ingredients, and step-by-step instructions."""
     lower = text.lower()
     if not ("ingredient" in lower and ("instruction" in lower or "step" in lower or "direction" in lower)):
         return None
@@ -129,16 +138,16 @@ def _text_to_a2ui(text: str) -> dict | None:
 
     for line in text.splitlines():
         line_clean = line.strip()
-        lower = line_clean.lower()
-        if "ingredients" in lower and ("breakdown" in lower or line_clean.startswith("#") or line_clean.endswith(":")):
+        lower_l = line_clean.lower()
+        if "ingredients" in lower_l and ("breakdown" in lower_l or line_clean.startswith("#") or line_clean.endswith(":")):
             in_ingredients = True
             in_instructions = False
             continue
-        elif ("instructions" in lower or "step-by-step" in lower or "directions" in lower) and (line_clean.startswith("#") or line_clean.endswith(":")):
+        elif ("instructions" in lower_l or "step-by-step" in lower_l or "directions" in lower_l) and (line_clean.startswith("#") or line_clean.endswith(":")):
             in_ingredients = False
             in_instructions = True
             continue
-        elif line_clean.startswith("###") or line_clean.startswith("---") or "quick pantry ideas" in lower or "culinary tip" in lower:
+        elif line_clean.startswith("###") or line_clean.startswith("---") or "quick pantry ideas" in lower_l or "culinary tip" in lower_l or "chef's tip" in lower_l:
             in_ingredients = False
             in_instructions = False
 
@@ -160,11 +169,28 @@ def _text_to_a2ui(text: str) -> dict | None:
     comps = []
     col_children = []
 
+    # 0. Check for Hero Image URL in text
+    img_match = re.search(r"(https://storage\.googleapis\.com/[^\s\"\')]+\.(?:jpg|jpeg|png)|https://images\.unsplash\.com/[^\s\"\')]+)", text, re.I)
+    if img_match:
+        img_id = f"hero_img_{uuid.uuid4().hex[:4]}"
+        comps.append({
+            "id": img_id,
+            "component": {
+                "Image": {
+                    "url": {"literalString": img_match.group(1)},
+                    "altText": {"literalString": title},
+                    "usageHint": "header",
+                    "fit": "cover"
+                }
+            }
+        })
+        col_children.append(img_id)
+
     # 1. Title
     t_id = f"title_{uuid.uuid4().hex[:4]}"
     comps.append({
         "id": t_id,
-        "component": {"Text": {"text": {"literalString": f"🥗 {title}"}, "usageHint": "h1"}}
+        "component": {"Text": {"text": {"literalString": f"🍳 {title}"}, "usageHint": "h1"}}
     })
     col_children.append(t_id)
 
@@ -192,12 +218,12 @@ def _text_to_a2ui(text: str) -> dict | None:
     comps.append({"id": div1_id, "component": {"Divider": {}}})
     col_children.append(div1_id)
 
-    # 4. Ingredients section
+    # 4. Ingredients section with exact portions
     if ingredients:
         ing_head_id = f"ing_h_{uuid.uuid4().hex[:4]}"
         comps.append({
             "id": ing_head_id,
-            "component": {"Text": {"text": {"literalString": "Ingredients"}, "usageHint": "h3"}}
+            "component": {"Text": {"text": {"literalString": "🛒 Portioned Ingredients"}, "usageHint": "h3"}}
         })
         col_children.append(ing_head_id)
 
@@ -219,7 +245,7 @@ def _text_to_a2ui(text: str) -> dict | None:
         })
         col_children.append(list1_id)
 
-    # 5. Instructions section
+    # 5. Instructions section with step badges
     if instructions:
         div2_id = f"div2_{uuid.uuid4().hex[:4]}"
         comps.append({"id": div2_id, "component": {"Divider": {}}})
@@ -228,7 +254,7 @@ def _text_to_a2ui(text: str) -> dict | None:
         inst_head_id = f"inst_h_{uuid.uuid4().hex[:4]}"
         comps.append({
             "id": inst_head_id,
-            "component": {"Text": {"text": {"literalString": "Cooking Instructions"}, "usageHint": "h3"}}
+            "component": {"Text": {"text": {"literalString": "👨‍🍳 Step-by-Step Instructions"}, "usageHint": "h3"}}
         })
         col_children.append(inst_head_id)
 
@@ -258,6 +284,122 @@ def _text_to_a2ui(text: str) -> dict | None:
     })
 
     # Root Card
+    root_card_id = f"card_{uuid.uuid4().hex[:4]}"
+    comps.insert(0, {
+        "id": root_card_id,
+        "component": {"Card": {"child": col_id}}
+    })
+
+    return {
+        "surfaceUpdate": {
+            "surfaceId": surface_id,
+            "components": comps
+        }
+    }
+
+
+def _suggestions_to_a2ui(text: str) -> dict | None:
+    """If text contains dish suggestions, convert it into a structured A2UI v0.8 message."""
+    lower = text.lower()
+    has_ing = bool(re.search(r"(?:^|\n)\s*(?:#{1,3}\s*)?(?:🛒\s*)?ingredients", lower))
+    has_inst = bool(re.search(r"(?:^|\n)\s*(?:#{1,3}\s*)?(?:👨‍🍳\s*)?(?:step-by-step\s+)?(?:instructions|directions)", lower))
+    has_bullets = any(line.strip().startswith(("• ", "* ", "- ")) for line in text.splitlines())
+    has_numbered_steps = any(re.match(r"^\d+\.\s+(?:Prep|Cook|Heat|Sauté|Mix|Bake|Serve|Simmer|Boil|Chop|Season|Toss|Combine)", line.strip(), re.I) for line in text.splitlines())
+    if (has_ing and has_bullets) or has_numbered_steps:
+        return None
+
+    lines = text.splitlines()
+    dish_items = []
+    current_dish = None
+
+    for line in lines:
+        l_str = line.strip()
+        # Match numbered dish header: e.g. "1. Classic Chicken Fried Rice" or "### 1. Dish"
+        m = re.match(r"^(?:#{1,3}\s*)?(?:\d+\.|\*|\-)\s*(?:\*\*)?(?:[🍽️🥗🍲🍳🥪🥘🥩🍛✨]?\s*)([A-Z][^\n*:(]+)(?:\*\*)?", l_str)
+        if m and not any(kw in m.group(1).lower() for kw in ("chef", "suggestion", "ingredient", "instruction", "step", "prep", "tip", "grocery", "overview")):
+            if current_dish and (current_dish["desc"] or current_dish["meta"]):
+                dish_items.append(current_dish)
+            current_dish = {"title": m.group(1).strip(), "desc": [], "meta": []}
+            continue
+
+        if current_dish:
+            if any(k in l_str.lower() for k in ("time:", "difficulty:", "pantry match:", "⏱️", "🟢", "🏷️", "⭐", "uses ")):
+                current_dish["meta"].append(l_str)
+            elif l_str and not l_str.startswith("#") and not l_str.startswith("---") and "ready to cook" not in l_str.lower():
+                current_dish["desc"].append(l_str)
+
+    if current_dish and (current_dish["desc"] or current_dish["meta"]):
+        dish_items.append(current_dish)
+
+    if len(dish_items) < 2:
+        return None
+
+    surface_id = f"suggestions_{uuid.uuid4().hex[:8]}"
+    comps = []
+    col_children = []
+
+    # Title
+    t_id = f"sug_title_{uuid.uuid4().hex[:4]}"
+    comps.append({
+        "id": t_id,
+        "component": {"Text": {"text": {"literalString": "🍽️ Chef's Dish Suggestions"}, "usageHint": "h1"}}
+    })
+    col_children.append(t_id)
+
+    # Subtitle
+    sub_id = f"sug_sub_{uuid.uuid4().hex[:4]}"
+    comps.append({
+        "id": sub_id,
+        "component": {"Text": {"text": {"literalString": "Personalized recipe ideas based on your available ingredients:"}, "usageHint": "caption"}}
+    })
+    col_children.append(sub_id)
+
+    div_id = f"sug_div_{uuid.uuid4().hex[:4]}"
+    comps.append({"id": div_id, "component": {"Divider": {}}})
+    col_children.append(div_id)
+
+    for idx, d in enumerate(dish_items):
+        dt_id = f"dish_t_{idx}_{uuid.uuid4().hex[:4]}"
+        comps.append({
+            "id": dt_id,
+            "component": {"Text": {"text": {"literalString": f"### {idx+1}. {d['title']}"}, "usageHint": "h2"}}
+        })
+        col_children.append(dt_id)
+
+        if d["desc"]:
+            dd_id = f"dish_d_{idx}_{uuid.uuid4().hex[:4]}"
+            comps.append({
+                "id": dd_id,
+                "component": {"Text": {"text": {"literalString": " ".join(d['desc'])}, "usageHint": "body"}}
+            })
+            col_children.append(dd_id)
+
+        if d["meta"]:
+            dm_id = f"dish_m_{idx}_{uuid.uuid4().hex[:4]}"
+            comps.append({
+                "id": dm_id,
+                "component": {"Text": {"text": {"literalString": " | ".join(d['meta'])}, "usageHint": "caption"}}
+            })
+            col_children.append(dm_id)
+
+        sep_id = f"dish_sep_{idx}_{uuid.uuid4().hex[:4]}"
+        comps.append({"id": sep_id, "component": {"Divider": {}}})
+        col_children.append(sep_id)
+
+    # Closing CTA
+    cta_id = f"sug_cta_{uuid.uuid4().hex[:4]}"
+    comps.append({
+        "id": cta_id,
+        "component": {"Text": {"text": {"literalString": "👉 Ready to cook? Ask me: \"Give me the recipe for [Dish Name]\" to see exact portioned ingredients, step-by-step instructions, and a photo of the finished dish!"}, "usageHint": "body"}}
+    })
+    col_children.append(cta_id)
+
+    col_id = f"col_{uuid.uuid4().hex[:4]}"
+    comps.append({
+        "id": col_id,
+        "component": {"Column": {"children": {"explicitList": col_children}}}
+    })
+
     root_card_id = f"card_{uuid.uuid4().hex[:4]}"
     comps.insert(0, {
         "id": root_card_id,
@@ -371,6 +513,12 @@ def _extract_parts(parts: list) -> list[dict]:
                             continue
                         else:
                             out.append({"kind": "a2ui", "data": recipe_a2ui, "rawText": text})
+                            has_a2ui = True
+                            continue
+                    else:
+                        suggestions_a2ui = _suggestions_to_a2ui(text)
+                        if suggestions_a2ui:
+                            out.append({"kind": "a2ui", "data": suggestions_a2ui, "rawText": text})
                             has_a2ui = True
                             continue
 

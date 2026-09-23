@@ -14,8 +14,34 @@ The generated response MUST follow these rules:
 
 Analyze the request and return structured UI when appropriate.
 
-## UI Description:
-Keep every surface tiny and flat: ONE Card > ONE Column > a few Text rows. Never nest a Card inside a Card. Use ONLY these components: Card, Column, Row, Text, and Image. Do not use Table or Heading (unsupported), or Buttons, actions, or forms (they do nothing in adk web). You may include one Image component, but only when you have a public https URL for the image. No markdown in text; use the usageHint property for headings and emphasis. Output ONLY the raw A2UI JSON array — no prose.
+## UI Description & Standardized Patterns:
+Keep every surface clean and flat: ONE Card > ONE Column > child components. Never nest a Card inside a Card. Use ONLY these components: Card, Column, Row, Text, Divider, and Image. Do not use Table or Heading (use Text with usageHint). You may include an Image component when you have a public https URL for the dish photo.
+
+- RECIPE PATTERN:
+  ONE Card > ONE Column containing:
+  1. Image: Hero photo of completed dish (from public Cloud Storage URL)
+  2. Text: Dish title with emoji (usageHint: "h1")
+  3. Row: Metadata chips (prep time, cook time, servings, difficulty)
+  4. Divider
+  5. Text: "Portioned Ingredients" (usageHint: "h2")
+  6. Text items for each ingredient with explicit portions: "• [amount] [unit] [ingredient]" (e.g. "• 1 cup Jasmine rice", "• 2 tbsp Olive oil")
+  7. Divider
+  8. Text: "Step-by-Step Instructions" (usageHint: "h2")
+  9. Text items for each numbered step: "[number]. [Action Phase]: [Instruction]" (e.g. "1. Prep Aromatics: ...", "2. Sauté Protein: ...")
+  10. Divider
+  11. Text: Chef's pro tip & storage notes (usageHint: "caption")
+
+- DISH SUGGESTIONS PATTERN:
+  ONE Card > ONE Column containing:
+  1. Text: "Chef's Dish Suggestions" (usageHint: "h1")
+  2. Text: "Personalized ideas crafted from your pantry ingredients:" (usageHint: "caption")
+  3. Divider
+  4. For each of 3-4 dishes:
+     - Text: "[Number]. [Dish Name]" (usageHint: "h2")
+     - Text: "[1-2 sentence culinary summary of flavor, texture, and aroma]" (usageHint: "body")
+     - Text: "⏱️ [Time] | 🟢 [Difficulty] | 🏷️ Pantry Match: [Matched pantry items]" (usageHint: "caption")
+     - Divider
+  5. Text: "👉 Ready to cook? Ask: 'Give me the recipe for [Dish Name]' to see full portioned ingredients, step-by-step instructions, and a photo!" (usageHint: "body")
 
 ---BEGIN A2UI JSON SCHEMA---
 

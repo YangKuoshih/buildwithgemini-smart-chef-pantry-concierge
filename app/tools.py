@@ -817,15 +817,19 @@ def generate_dish_image(dish_name: str, tool_context: ToolContext) -> Dict[str, 
         if not image_bytes:
             return {"status": "error", "message": "No image data returned from image generation model."}
 
-        # 1. Save artifact to ToolContext for the Playground's Artifacts panel
+        # 1. Save artifact to ToolContext for the Playground's Artifacts panel (if available)
         safe_name = "".join(c if c.isalnum() else "_" for c in dish_name.lower())[:30].strip("_")
         artifact_filename = f"{safe_name}_{uuid.uuid4().hex[:6]}.jpg"
 
-        tool_context.save_artifact(
-            filename=artifact_filename,
-            artifact=types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"),
-            custom_metadata={"dish_name": dish_name, "type": "dish_presentation_photo"}
-        )
+        if tool_context and hasattr(tool_context, "save_artifact"):
+            try:
+                tool_context.save_artifact(
+                    filename=artifact_filename,
+                    artifact=types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"),
+                    custom_metadata={"dish_name": dish_name, "type": "dish_presentation_photo"}
+                )
+            except Exception as se:
+                print(f"Artifact save skipped: {se}")
 
         # 2. Upload same bytes to public Cloud Storage bucket
         storage_client = storage.Client(project=FIRESTORE_PROJECT_ID)

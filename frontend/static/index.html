@@ -844,12 +844,143 @@ body {
 
 .a2img {
   width: 100%;
-  max-width: 480px;
+  max-width: 520px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-subtle);
   box-shadow: var(--shadow-sm);
   margin-top: 8px;
   object-fit: cover;
+}
+
+.a2-dish-hero {
+  width: 100%;
+  max-width: 100%;
+  height: 250px;
+  border-radius: var(--radius-md);
+  border: 1.5px solid rgba(234, 88, 12, 0.25);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+  margin-top: 0;
+  margin-bottom: 10px;
+  object-fit: cover;
+  transition: transform 0.2s;
+}
+.a2-dish-hero:hover {
+  transform: scale(1.01);
+}
+
+/* Ingredient with Hover Preview & Checkbox */
+.a2-ing-box {
+  position: relative;
+  overflow: visible !important;
+}
+
+.a2-ing-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  position: relative;
+}
+
+.a2-ing-thumb {
+  width: 26px;
+  height: 26px;
+  border-radius: 4px;
+  object-fit: contain;
+  background: #ffffff;
+  border: 1px solid var(--border-subtle);
+  padding: 1px;
+  flex-shrink: 0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.a2-ing-label {
+  font-size: 13px;
+  color: var(--text-main);
+  line-height: 1.4;
+  flex: 1;
+}
+
+.a2-ing-popover {
+  position: absolute;
+  left: 36px;
+  bottom: calc(100% + 8px);
+  background: #ffffff;
+  border: 1.5px solid var(--primary-border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.15), 0 4px 10px rgba(0, 0, 0, 0.05);
+  padding: 8px 12px;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  z-index: 1000;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.a2-ing-popover::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 20px;
+  border-width: 6px;
+  border-style: solid;
+  border-color: #ffffff transparent transparent transparent;
+}
+
+.a2-ing-popover-img {
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
+  border-radius: 4px;
+  background: #fafaf9;
+}
+
+.a2-ing-popover-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #1c1917;
+  text-transform: capitalize;
+}
+
+.a2-ing-wrap:hover .a2-ing-popover {
+  display: flex;
+}
+
+/* Suggestion CTA button */
+.a2-suggestion-cta {
+  background: var(--bg-canvas);
+  border: 1px dashed var(--primary-border);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.a2-suggestion-btn {
+  background: linear-gradient(135deg, #ea580c, #c2410c);
+  color: #ffffff;
+  border: none;
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 2px 4px rgba(234, 88, 12, 0.2);
+}
+
+.a2-suggestion-btn:hover {
+  background: linear-gradient(135deg, #c2410c, #9a3412);
+  transform: translateY(-1px);
 }
 
 /* Toast feedback */
@@ -1266,6 +1397,39 @@ function addCopyButton(bubbleEl, rawText) {
  * Renders Card / Column / Row / Text / Divider / List / Image / Icon.
  * -------------------------------------------------------------------------- */
 
+function extractCoreIngredient(text) {
+  const common = [
+    "Chicken Breast", "Chicken", "Jasmine Rice", "Rice", "Eggs", "Egg",
+    "Butter", "Olive Oil", "Onion", "Spinach", "Cheddar", "Cheese",
+    "Salmon", "Pepper", "Salt", "Lemon", "Lime", "Avocado", "Tomato",
+    "Beef", "Pork", "Bacon", "Soy Sauce", "Ginger", "Garlic", "Sesame Oil",
+    "Cumin", "Paprika", "Cilantro", "Parsley", "Basil", "Oregano", "Thyme",
+    "Rosemary", "Oats", "Chia Seeds", "Honey", "Maple Syrup", "Milk",
+    "Almond Milk", "Flour", "Sugar", "Chickpeas", "Black Beans", "Quinoa",
+    "Sweet Potato", "Broccoli", "Mushroom", "Carrot", "Zucchini", "Bell Pepper",
+    "Scallion", "Green Onion"
+  ];
+  let clean = text.replace(/^\d+[\d/\.\s]*(?:cup|cups|tbsp|tsp|tablespoon|teaspoons?|clove|cloves|oz|lb|lbs|gram|grams|g|ml|pinch|dash|bunch|handful|can|cans|slice|slices)?s?\b/i, "").trim();
+  clean = clean.split(",")[0].trim();
+  for (const c of common) {
+    const rx = new RegExp("\\b" + c + "\\b", "i");
+    if (rx.test(clean)) return c;
+  }
+  const words = clean.split(/\s+/).filter(w => !["fresh", "diced", "chopped", "sliced", "minced", "large", "small", "medium", "organic", "extra", "virgin", "shredded", "cooked", "chilled", "grated", "warm", "boneless", "skinless"].includes(w.toLowerCase()));
+  if (words.length > 0) {
+    const w = words[words.length - 1];
+    return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+  }
+  return "Food";
+}
+
+function submitDishPrompt(dishName) {
+  if (input) {
+    input.value = `Give me the recipe for ${dishName}`;
+    form.dispatchEvent(new Event("submit"));
+  }
+}
+
 function boundStr(v) {
   if (v == null) return "";
   if (typeof v === "string") return v;
@@ -1318,19 +1482,51 @@ function buildNode(id, comps, seen) {
                 : hint === "caption" ? "a2text a2-caption"
                 : "a2text";
 
-      // If this is a list item or body text starting with bullet, style as interactive item
+      // If this is a list item or body text starting with bullet (ingredient with hover image & checkbox)
       if (t.startsWith("• ")) {
-        const itemBox = el("div", "a2-item-box");
+        const itemBox = el("div", "a2-item-box a2-ing-box");
         const chk = document.createElement("input");
         chk.type = "checkbox";
         chk.className = "a2-check";
         chk.onclick = (ev) => {
-          ev.target.nextElementSibling.style.textDecoration = ev.target.checked ? "line-through" : "none";
-          ev.target.nextElementSibling.style.color = ev.target.checked ? "var(--text-muted)" : "var(--text-main)";
+          const lbl = ev.target.parentElement.querySelector(".a2-ing-label");
+          if (lbl) {
+            lbl.style.textDecoration = ev.target.checked ? "line-through" : "none";
+            lbl.style.color = ev.target.checked ? "var(--text-muted)" : "var(--text-main)";
+          }
         };
-        const span = el("span", "", t.substring(2));
+
+        const ingText = t.substring(2);
+        const coreName = extractCoreIngredient(ingText);
+        const thumbUrl = `https://www.themealdb.com/images/ingredients/${encodeURIComponent(coreName)}-Small.png`;
+
+        const wrap = el("div", "a2-ing-wrap");
+
+        // Small thumbnail next to ingredient
+        const thumb = el("img", "a2-ing-thumb");
+        thumb.src = thumbUrl;
+        thumb.alt = coreName;
+        thumb.loading = "lazy";
+        thumb.onerror = () => { thumb.style.display = "none"; };
+
+        // Floating hover preview popover
+        const popover = el("div", "a2-ing-popover");
+        const popImg = el("img", "a2-ing-popover-img");
+        popImg.src = thumbUrl;
+        popImg.alt = coreName;
+        popImg.onerror = () => { popover.style.display = "none"; };
+        const popTitle = el("div", "a2-ing-popover-title", coreName);
+        popover.appendChild(popImg);
+        popover.appendChild(popTitle);
+
+        const span = el("span", "a2-ing-label", ingText);
+
+        wrap.appendChild(thumb);
+        wrap.appendChild(span);
+        wrap.appendChild(popover);
+
         itemBox.appendChild(chk);
-        itemBox.appendChild(span);
+        itemBox.appendChild(wrap);
         return itemBox;
       }
 
@@ -1343,6 +1539,14 @@ function buildNode(id, comps, seen) {
         stepBox.appendChild(badge);
         stepBox.appendChild(span);
         return stepBox;
+      }
+
+      // If this is a call-to-action in Dish Suggestions, render an interactive action button
+      if (t.includes("Give me the recipe for") || (t.startsWith("👉") && t.includes("recipe"))) {
+        const ctaWrap = el("div", "a2-suggestion-cta");
+        const msgSpan = el("span", "a2text", t);
+        ctaWrap.appendChild(msgSpan);
+        return ctaWrap;
       }
 
       return el("p", cls, t);
@@ -1359,9 +1563,11 @@ function buildNode(id, comps, seen) {
       return ul;
     }
     case "Image": {
-      const img = el("img", "a2img");
+      const hint = props.usageHint || "";
+      const isHero = hint === "header" || hint === "largeFeature" || boundStr(props.url).includes("/dishes/");
+      const img = el("img", isHero ? "a2img a2-dish-hero" : "a2img");
       img.src = boundStr(props.url);
-      img.alt = boundStr(props.accessibilityLabel) || "Generated Dish Visual";
+      img.alt = boundStr(props.altText) || boundStr(props.accessibilityLabel) || "Delicious Completed Dish";
       img.loading = "lazy";
       return img;
     }
