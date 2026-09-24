@@ -142,15 +142,19 @@ gcloud run deploy smart-chef-pantry-frontend \
 
 ---
 
-## 🛠️ Antigravity & Agent Skills
+## 🛠️ Agent Skills (prerequisite)
 
-This repository includes a full collection of **18 agent skills** in the `skills/` directory.
+This project was built in **Antigravity** using the Google Agents CLI skill suite
+(Apache-2.0, © Google LLC) plus workshop lab skills from Google's Build with Gemini
+event. Those skills are **development tooling, not runtime dependencies** — they are
+installed into your own Antigravity environment rather than vendored here.
 
-To install these skills into your local Antigravity environment:
 ```bash
-./install_skills.sh
+./install_skills.sh          # installs skills into ~/.gemini/antigravity/skills/
 ```
-Or unzip `skills/agent_skills_bundle.zip` directly into your Antigravity skills directory (`~/.gemini/antigravity/skills/` or `.agents/skills/`).
+
+If you do not have the skills locally, the application still builds and deploys
+normally — they assist authoring, not execution.
 
 ---
 
@@ -169,9 +173,32 @@ Or unzip `skills/agent_skills_bundle.zip` directly into your Antigravity skills 
 ├── scripts/
 │   ├── seed_firestore.py      # Seeds sample pantry inventory into Firestore
 │   └── setup_rag.py           # Sets up Vertex AI RAG corpus
-├── skills/                    # 18 production-ready Agent Skills
-├── install_skills.sh          # One-command skill installer for Antigravity
+├── install_skills.sh          # Installs Antigravity skills into your environment
 ├── setup_gcp.sh               # One-command GCP reproduction script
 ├── deployment_metadata.json   # Deployed reasoning engine metadata
 └── pyproject.toml             # Python dependencies and build config
 ```
+
+---
+
+## 🙏 Built With
+
+- **[Google Agent Development Kit (ADK)](https://google.github.io/adk-docs/)** — agent runtime and primitives
+- **Gemini 2.5 Flash** on **Vertex AI Agent Runtime** (Reasoning Engine)
+- **A2A** (Agent-to-Agent) protocol for frontend ↔ agent transport
+- **A2UI** for agent-rendered cards, rows, and checklists
+- **Vertex AI RAG Engine** over a public-domain recipe corpus
+- **Imagen 3** for generated dish photography
+- **Firestore**, **Cloud Storage**, **Cloud Run**
+
+Built during Google's *Build with Gemini* event. Google ADK and the Google Agents
+CLI are © Google LLC, licensed under Apache-2.0, and are used here as dependencies.
+
+---
+
+## 📄 License
+
+Copyright 2026 Kuoshih (Tony) Yang
+
+Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) and
+[NOTICE](NOTICE) for details.

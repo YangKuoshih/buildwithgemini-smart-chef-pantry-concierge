@@ -223,3 +223,7 @@ application_default_credentials.json
 service-account*.json
 # Keep the demo GIF (README embeds it); ignore the large raw recording.
 *.webm
+
+# personal agent skills live in the private agent-skills-toolkit repo
+.agents/skills/
+skills/
