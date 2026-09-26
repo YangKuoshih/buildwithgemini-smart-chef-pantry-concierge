@@ -7,8 +7,39 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
+<!-- Both libraries are vendored and served same-origin. The previous build also
+     pulled marked from an unpinned CDN URL, which overwrote the local copy and
+     made the page trust whatever that URL returned; served locally there is no
+     third-party script to compromise and no version drift. -->
 <script src="/marked.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="/purify.min.js"></script>
+<script>
+// Agent replies are model output and may echo text from the RAG corpus or from
+// pantry items a user supplied, so Markdown rendered into innerHTML is an XSS
+// sink: marked does not strip HTML. Render everything through here instead.
+// If DOMPurify is unavailable the text is inserted as plain text rather than
+// markup, so a failed CDN load degrades to unstyled output, never to raw HTML.
+// Error text can carry a server-supplied message, so build the node rather than
+// interpolating into a markup string.
+function errorSpan(message) {
+  const span = document.createElement("span");
+  span.style.color = "#dc2626";
+  span.textContent = message;
+  return span;
+}
+
+function renderMarkdownSafely(targetEl, text) {
+  const source = text == null ? "" : String(text);
+  const canRender =
+    window.marked && typeof window.marked.parse === "function" &&
+    window.DOMPurify && typeof window.DOMPurify.sanitize === "function";
+  if (canRender) {
+    targetEl.innerHTML = window.DOMPurify.sanitize(window.marked.parse(source));
+  } else {
+    targetEl.textContent = source;
+  }
+}
+</script>
 <style>
 :root {
   --primary: #ea580c;
@@ -1241,7 +1272,13 @@ async function loadPantry() {
       chip.type = "button";
       chip.className = "pantry-item-chip";
       const icon = item.category === "produce" ? "🥬" : item.category === "dairy" ? "🥛" : item.category === "pantry" ? "🥫" : "🍗";
-      chip.innerHTML = `<span>${icon}</span> <span>${item.item_name}</span>`;
+      // item_name comes from Firestore and is user-writable via the agent, so
+      // it is set as text rather than interpolated into an innerHTML template.
+      const iconSpan = document.createElement("span");
+      iconSpan.textContent = icon;
+      const nameSpan = document.createElement("span");
+      nameSpan.textContent = item.item_name == null ? "" : String(item.item_name);
+      chip.append(iconSpan, document.createTextNode(" "), nameSpan);
       chip.onclick = () => {
         handleChip(`What can I cook using ${item.item_name} from my pantry?`);
       };
@@ -1668,7 +1705,7 @@ form.onsubmit = async (e) => {
     });
 
     if (!res.ok) {
-      ab.innerHTML = `<span style="color: #dc2626;">Error: Server returned status ${res.status}</span>`;
+      ab.replaceChildren(errorSpan(`Error: Server returned status ${res.status}`));
       return;
     }
 
@@ -1684,11 +1721,7 @@ form.onsubmit = async (e) => {
     textParts.forEach(p => {
       fullText += p.text + "\n\n";
       const contentDiv = el("div", "markdown-body");
-      if (window.marked && typeof window.marked.parse === "function") {
-        contentDiv.innerHTML = marked.parse(p.text);
-      } else {
-        contentDiv.textContent = p.text;
-      }
+      renderMarkdownSafely(contentDiv, p.text);
       ab.appendChild(contentDiv);
     });
 
@@ -1703,7 +1736,7 @@ form.onsubmit = async (e) => {
       const flat = flattenText(a2uiMsgs);
       if (!drew && flat) {
         const fallbackDiv = el("div", "markdown-body");
-        fallbackDiv.innerHTML = window.marked ? marked.parse(flat) : flat;
+        renderMarkdownSafely(fallbackDiv, flat);
         ab.appendChild(fallbackDiv);
       }
       if (flat && !fullText.includes(flat)) {
@@ -1716,7 +1749,7 @@ form.onsubmit = async (e) => {
     }
 
   } catch (err) {
-    ab.innerHTML = `<span style="color: #dc2626;">Connection error: ${err.message}</span>`;
+    ab.replaceChildren(errorSpan(`Connection error: ${err.message}`));
   }
 };
 
